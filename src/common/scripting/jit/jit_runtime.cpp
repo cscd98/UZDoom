@@ -26,7 +26,11 @@
 #include "jitintern.h"
 
 #ifdef WIN32
+#ifdef __LIBRETRO__
+#include <dbghelp.h>
+#else
 #include <DbgHelp.h>
+#endif
 #include <psapi.h>
 #else
 #include <execinfo.h>

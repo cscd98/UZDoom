@@ -1389,9 +1389,14 @@ int FFont::StringWidth(const uint8_t *string, int spacing) const
 		std::vector<IntermediateDrawString> drawStrings;
 		drawStrings.reserve(4);
 		std::u32string utf32String;
+#if defined(__LIBRETRO__) && defined(__ANDROID__)
+		const size_t length = std::strlen((const char *)string);
+#else
+		const size_t length = std::char_traits<uint8_t>::length(string);
+#endif
 		utf32String.resize(
-			simdutf::utf32_length_from_utf8((const char *)string, std::char_traits<uint8_t>::length(string)), '\0');
-		simdutf::convert_utf8_to_utf32((const char *)string, std::char_traits<uint8_t>::length(string),
+			simdutf::utf32_length_from_utf8((const char *)string, length), '\0');
+		simdutf::convert_utf8_to_utf32((const char *)string, length,
 		                               utf32String.data());
 		ParseIntoIntermediateDrawStrings(utf32String, this, 0, drawStrings);
 

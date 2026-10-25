@@ -1,0 +1,37 @@
+name: Build UZDoom (libretro) for Windows (MinGW on Ubuntu)
+
+on: [push, pull_request]
+
+env:
+  core_id: uzdoom_libretro
+
+jobs:
+  build-windows-mingw:
+    runs-on: ubuntu-latest
+    container: ubuntu:25.10
+    steps:
+    - name: Install dependencies
+      run: |
+        apt update
+        apt install -y git cmake g++ make ninja-build pkg-config python3 \
+          mingw-w64 nasm libglib2.0-dev
+
+    - name: Checkout UZDoom (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure (MinGW cross-compile)
+      run: |
+        cd ${{ env.core_id }}
+        cmake -S . -B build -G Ninja \
+          -DENABLE_LIBRETRO=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DFORCE_NO_LTO=ON \
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/src/common/platform/libretro/mingw-x86_64.cmake"
+
+    - name: Build
+      run: |
+        cd ${{ env.core_id }}/build
+        ninja -j$(nproc)

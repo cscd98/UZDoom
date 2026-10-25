@@ -90,6 +90,10 @@ public:
 		}
 	}
 
+#ifdef __LIBRETRO__
+	~VkHardwareDataBuffer() override;
+#endif
+
 	void BindRange(FRenderState *state, size_t start, size_t length) override;
 
 	int bindingpoint;

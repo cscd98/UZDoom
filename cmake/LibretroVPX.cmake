@@ -1,0 +1,127 @@
+include(FetchContent)
+include(ExternalProject)
+
+set(LIBRETRO_VPX_SOURCE "" CACHE PATH "Existing libvpx source checkout (otherwise fetched)")
+set(LIBRETRO_VPX_JOBS 4 CACHE STRING "Parallel jobs for the libvpx dependency build")
+if(NOT LIBRETRO_VPX_SOURCE)
+    FetchContent_Declare(libretro_vpx_source
+        GIT_REPOSITORY https://github.com/webmproject/libvpx.git
+        GIT_TAG v1.15.0
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(libretro_vpx_source)
+    set(LIBRETRO_VPX_SOURCE "${libretro_vpx_source_SOURCE_DIR}")
+endif()
+if(NOT EXISTS "${LIBRETRO_VPX_SOURCE}/configure")
+    message(FATAL_ERROR "LIBRETRO_VPX_SOURCE must contain a libvpx source checkout")
+endif()
+find_program(LIBRETRO_VPX_MAKE NAMES gmake make NO_CMAKE_FIND_ROOT_PATH)
+if(NOT LIBRETRO_VPX_MAKE)
+    message(FATAL_ERROR "Building libvpx requires GNU make")
+endif()
+
+set(vpx_cc "${CMAKE_C_COMPILER}")
+set(vpx_cxx "${CMAKE_CXX_COMPILER}")
+set(vpx_flags "${CMAKE_C_FLAGS}")
+string(REPLACE "\"" "" vpx_flags "${vpx_flags}")
+string(STRIP "${vpx_flags}" vpx_flags)
+set(vpx_extra_env)
+if(ANDROID)
+    if(NOT CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+        message(FATAL_ERROR "Automatic libvpx build currently supports Android arm64-v8a; supply VPX_LIBRARIES for other ABIs")
+    endif()
+    set(vpx_target arm64-android-gcc)
+    get_filename_component(ndk_bin "${CMAKE_C_COMPILER}" DIRECTORY)
+    set(vpx_api "${CMAKE_SYSTEM_VERSION}")
+    if(ANDROID_PLATFORM MATCHES "^android-([0-9]+)$")
+        set(vpx_api "${CMAKE_MATCH_1}")
+    endif()
+    set(vpx_cc "${ndk_bin}/aarch64-linux-android${vpx_api}-clang")
+    set(vpx_cxx "${ndk_bin}/aarch64-linux-android${vpx_api}-clang++")
+    list(APPEND vpx_extra_env "AS=${vpx_cc}")
+elseif(APPLE)
+    set(vpx_apple_hint "${CMAKE_SYSTEM_NAME};${CMAKE_OSX_SYSROOT};${CMAKE_C_FLAGS}")
+    string(TOLOWER "${vpx_apple_hint}" vpx_apple_hint)
+    if(vpx_apple_hint MATCHES "tvos|appletv")
+        set(vpx_sdk_name appletvos)
+        set(vpx_min_flag -mtvos-version-min)
+    elseif(vpx_apple_hint MATCHES "ios|iphone")
+        set(vpx_sdk_name iphoneos)
+        set(vpx_min_flag -miphoneos-version-min)
+    else()
+        set(vpx_sdk_name macosx)
+        set(vpx_min_flag -mmacosx-version-min)
+    endif()
+    if(vpx_apple_hint MATCHES "simulator")
+        if(vpx_sdk_name STREQUAL "appletvos")
+            set(vpx_sdk_name appletvsimulator)
+            set(vpx_min_flag -mtvos-simulator-version-min)
+        else()
+            set(vpx_sdk_name iphonesimulator)
+            set(vpx_min_flag -mios-simulator-version-min)
+        endif()
+    endif()
+    execute_process(COMMAND xcrun --sdk ${vpx_sdk_name} --show-sdk-path
+        OUTPUT_VARIABLE vpx_sdk OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE sdk_result)
+    if(NOT sdk_result EQUAL 0)
+        message(FATAL_ERROR "Cannot locate the ${vpx_sdk_name} SDK for libvpx")
+    endif()
+    set(vpx_arch "${CMAKE_OSX_ARCHITECTURES}")
+    if(NOT vpx_arch)
+        set(vpx_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    if(vpx_arch MATCHES ";")
+        message(FATAL_ERROR "Build libvpx separately for each Apple architecture")
+    endif()
+    # Generic avoids libvpx substituting an iPhone SDK for tvOS/simulator builds.
+    set(vpx_target generic-gnu)
+    string(APPEND vpx_flags " -arch ${vpx_arch} -isysroot ${vpx_sdk}")
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        string(APPEND vpx_flags " ${vpx_min_flag}=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif()
+elseif(MINGW)
+    set(vpx_target x86_64-win64-gcc)
+    string(REGEX REPLACE "gcc(\\.exe)?$" "" vpx_cross "${CMAKE_C_COMPILER}")
+    list(APPEND vpx_extra_env "CROSS=${vpx_cross}")
+else()
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64" OR CMAKE_C_COMPILER MATCHES "aarch64")
+        set(vpx_target arm64-linux-gcc)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_C_COMPILER MATCHES "arm-webos")
+        set(vpx_target armv7-linux-gcc)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        set(vpx_target x86_64-linux-gcc)
+    else()
+        set(vpx_target generic-gnu)
+    endif()
+    if(CMAKE_C_COMPILER MATCHES "gcc$")
+        string(REGEX REPLACE "gcc$" "" vpx_cross "${CMAKE_C_COMPILER}")
+        list(APPEND vpx_extra_env "CROSS=${vpx_cross}")
+    endif()
+    if(CMAKE_SYSROOT)
+        string(APPEND vpx_flags " --sysroot=${CMAKE_SYSROOT}")
+    endif()
+endif()
+
+set(vpx_dir "${CMAKE_BINARY_DIR}/libretro-vpx")
+ExternalProject_Add(libretro_vpx_build
+    SOURCE_DIR "${LIBRETRO_VPX_SOURCE}"
+    BINARY_DIR "${vpx_dir}"
+    DOWNLOAD_COMMAND ""
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        "CC=${vpx_cc}" "CXX=${vpx_cxx}" "LD=${vpx_cxx}"
+        "AR=${CMAKE_AR}" "STRIP=${CMAKE_STRIP}"
+        "CFLAGS=${vpx_flags}" "CXXFLAGS=${vpx_flags}" "LDFLAGS=${vpx_flags}"
+        ${vpx_extra_env}
+        <SOURCE_DIR>/configure --target=${vpx_target}
+        --disable-examples --disable-tools --disable-docs --disable-unit-tests
+        --disable-vp8-encoder --disable-vp9-encoder
+        --disable-shared --enable-static --enable-pic
+    BUILD_COMMAND ${LIBRETRO_VPX_MAKE} -j${LIBRETRO_VPX_JOBS} libvpx.a
+    BUILD_BYPRODUCTS "${vpx_dir}/libvpx.a"
+    INSTALL_COMMAND "")
+
+add_library(libretro_vpx STATIC IMPORTED GLOBAL)
+set_target_properties(libretro_vpx PROPERTIES IMPORTED_LOCATION "${vpx_dir}/libvpx.a")
+add_dependencies(libretro_vpx libretro_vpx_build)
+set(VPX_FOUND TRUE)
+set(VPX_INCLUDE_DIR "${LIBRETRO_VPX_SOURCE}")
+set(VPX_LIBRARIES libretro_vpx)

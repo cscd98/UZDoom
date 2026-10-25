@@ -20,6 +20,9 @@
 // HEADER FILES ------------------------------------------------------------
 
 #include <memory>
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -919,6 +922,11 @@ void G_BuildTiccmd (usercmd_t *cmd)
 
 	cmd->forwardmove <<= 8;
 	cmd->sidemove <<= 8;
+
+#ifdef __LIBRETRO__
+    // VR supplies movement in final usercmd units, after the legacy conversion.
+    Libretro::ApplyVRInput(*cmd);
+#endif
 
 	buttons = cmd->buttons;
 }

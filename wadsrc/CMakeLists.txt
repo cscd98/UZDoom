@@ -21,3 +21,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E remove
 		"${CMAKE_CURRENT_SOURCE_DIR}/static/contributors.txt"
 )
+
+# Finish generated language and metadata before compiling the embedded archive.
+if(ENABLE_LIBRETRO)
+	add_dependencies(zdoom uzdoom_pk3)
+endif()

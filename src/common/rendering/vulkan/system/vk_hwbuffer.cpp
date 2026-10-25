@@ -246,6 +246,9 @@ void VkHardwareVertexBuffer::SetFormat(int numBindingPoints, int numAttributes, 
 
 /////////////////////////////////////////////////////////////////////////////
 
+#ifdef __LIBRETRO__
+VkHardwareDataBuffer::~VkHardwareDataBuffer() = default;
+#endif
 
 void VkHardwareDataBuffer::BindRange(FRenderState* state, size_t start, size_t length)
 {

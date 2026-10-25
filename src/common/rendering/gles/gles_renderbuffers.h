@@ -123,6 +123,11 @@ public:
 
 
 	void BindOutputFB();
+#ifdef __LIBRETRO__
+    void SelectEye(int eye);
+    void NextEye(int count) { SelectEye((mCurrentEye + 1) % count); }
+    void BindEyeTexture(int eye, int unit);
+#endif
 
 	void BindDitherTexture(int texunit);
 
@@ -150,6 +155,17 @@ private:
 	void DeleteRenderBuffer(PPGLRenderBuffer &handle);
 	void DeleteFrameBuffer(PPGLFrameBuffer &handle);
 
+#ifdef __LIBRETRO__
+    using MultisampleStorage = void (APIENTRY *)(GLenum, GLsizei, GLenum, GLsizei, GLsizei);
+    using MultisampleTexture = void (APIENTRY *)(GLenum, GLenum, GLenum, GLuint, GLint, GLsizei);
+    MultisampleStorage mMultisampleStorage = nullptr;
+    MultisampleTexture mMultisampleTexture = nullptr;
+    bool mMSAAInitialized = false;
+    int mMaxSamples = 1, mSamples = 1, mRequestedSamples = -1;
+    int mCurrentEye = 0;
+    PPGLTexture mOtherEyeTex;
+    PPGLFrameBuffer mOtherEyeFB;
+#endif
 	int mWidth = 0;
 	int mHeight = 0;
 	int mSceneWidth = 0;

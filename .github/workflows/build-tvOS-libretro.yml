@@ -1,0 +1,47 @@
+name: Build UZDoom (libretro) on tvOS
+
+on: [push, pull_request]
+
+env:
+  core_id: uzdoom_libretro
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install dylibbundler cmake fluid-synth \
+          mbedtls molten-vk vulkan-volk zlib nasm ninja
+
+    - name: Checkout UZDoom (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure (tvOS arm64)
+      run: |
+        cd ${{ env.core_id }}
+
+        export PKG_CONFIG_PATH=""
+        mkdir -p build/ios-pkgconfig
+        export PKG_CONFIG_LIBDIR="$PWD/build/ios-pkgconfig"
+
+        cmake -S . -B build/tvos-arm64 -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_FLAGS="" \
+          -DCMAKE_CXX_FLAGS="" \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DCMAKE_SYSTEM_NAME=tvOS \
+          -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DENABLE_LIBRETRO=ON \
+          -DFORCE_NO_LTO=ON \
+          -DHAVE_VULKAN=OFF
+
+    - name: Build
+      run: |
+        cmake --build ${{ env.core_id }}/build/tvos-arm64 --parallel "$(sysctl -n hw.ncpu)"

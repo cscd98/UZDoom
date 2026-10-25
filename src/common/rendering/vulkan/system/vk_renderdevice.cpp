@@ -1,3 +1,6 @@
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vulkan.h"
+#endif
 /*
 ** vk_renderdevice.cpp
 **
@@ -112,12 +115,16 @@ void VulkanPrintLog(const char* typestr, const std::string& msg)
 VulkanRenderDevice::VulkanRenderDevice(void *hMonitor, bool fullscreen, std::shared_ptr<VulkanSurface> surface) :
 	Super(hMonitor, fullscreen)
 {
+#ifdef __LIBRETRO__
+	device = Libretro::BorrowVulkanDevice();
+#else
 	VulkanDeviceBuilder builder;
 	builder.OptionalRayQuery();
 	builder.Surface(surface);
 	builder.SelectDevice(vk_device);
 	SupportedDevices = builder.FindDevices(surface->Instance);
 	device = builder.Create(surface->Instance);
+#endif
 }
 
 VulkanRenderDevice::~VulkanRenderDevice()

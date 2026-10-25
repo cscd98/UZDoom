@@ -1,0 +1,49 @@
+name: Build UZDoom (libretro) on Android
+
+on: [push, pull_request]
+
+env:
+  core_id: uzdoom_libretro
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git g++ make pkg-config python3 wget unzip cmake ninja-build \
+          libglib2.0-dev
+        wget https://dl.google.com/android/repository/android-ndk-r29-linux.zip
+        unzip -q android-ndk-r29-linux.zip
+        echo "ANDROID_NDK_HOME=$PWD/android-ndk-r29" >> $GITHUB_ENV
+
+    - name: Checkout UZDoom (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure
+      run: |
+        deps_dir="$PWD/deps"
+  
+        # Keep host Linux pkg-config packages out of the Android build.
+        mkdir -p "$deps_dir/android-pkgconfig"
+        export PKG_CONFIG_LIBDIR="$deps_dir/android-pkgconfig"
+        export PKG_CONFIG_PATH=
+
+        cd ${{ env.core_id }}
+        cmake -S . -B build/android-arm64-v8a -G Ninja \
+          -DENABLE_LIBRETRO=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DFORCE_NO_LTO=ON \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-26 \
+          -DANDROID_STL=c++_static \
+          -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+
+    - name: Build
+      run: |
+        cmake --build ${{ env.core_id }}/build/android-arm64-v8a --parallel "$(nproc)"

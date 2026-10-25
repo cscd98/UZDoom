@@ -148,7 +148,10 @@ static PROC WinGetProcAddress(const char *name)
 
 #define IntGetProcAddress(name) WinGetProcAddress(name)
 #else
-	#if defined(__APPLE__)
+	#if defined(__LIBRETRO__)
+		extern void *LibretroGLGetProcAddress(const char *name);
+		#define IntGetProcAddress(name) LibretroGLGetProcAddress((const char *)name)
+	#elif defined(__APPLE__)
 		#define IntGetProcAddress(name) AppleGLGetProcAddress(name)
 	#else
 		#if defined(__sgi) || defined(__sun) || defined(__unix__) || defined(__HAIKU__)

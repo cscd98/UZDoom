@@ -33,7 +33,11 @@
 */
 
 #ifdef _WIN32
+#ifdef __MINGW32__
+#include <windows.h>
+#else
 #include <Windows.h>
+#endif
 #include <mmsystem.h>
 #endif
 #include <algorithm>

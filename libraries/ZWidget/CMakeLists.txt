@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.11)
 project(zwidget)
 
-if (UNIX AND NOT APPLE)
+option(ZWIDGET_HEADLESS "Build without native window backends" OFF)
+
+if (UNIX AND NOT APPLE AND NOT ZWIDGET_HEADLESS)
 	include(FindPkgConfig)
 	pkg_check_modules(DBUS dbus-1)
 	if (!DBUS_FOUND)
@@ -11,10 +13,12 @@ endif()
 
 # SDL2 finding stuff
 # Optional on all platforms
-find_package(SDL2 QUIET)
-if(NOT ${SDL2_FOUND})
-	include(FindPkgConfig)
-	pkg_search_module(SDL2 sdl2)
+if(NOT ZWIDGET_HEADLESS)
+	find_package(SDL2 QUIET)
+	if(NOT SDL2_FOUND)
+		include(FindPkgConfig)
+		pkg_search_module(SDL2 sdl2)
+	endif()
 endif()
 
 set(ZWIDGET_SOURCES
@@ -183,7 +187,9 @@ set(ZWIDGET_INCLUDE_DIRS include/zwidget src)
 
 set(ZWIDGET_COMPILE_OPTIONS)
 
-if(WIN32)
+if(ZWIDGET_HEADLESS)
+	set(ZWIDGET_LIBS ${CMAKE_DL_LIBS})
+elseif(WIN32)
 	set(ZWIDGET_SOURCES ${ZWIDGET_SOURCES} ${ZWIDGET_WIN32_SOURCES})
 	set(ZWIDGET_DEFINES -DUNICODE -D_UNICODE)
 	set(ZWIDGET_LINK_OPTIONS)
@@ -217,7 +223,7 @@ else()
 	endif()
 endif()
 
-if(SDL2_FOUND AND NOT WIN32)
+if(SDL2_FOUND AND NOT WIN32 AND NOT ZWIDGET_HEADLESS)
 	set(ZWIDGET_SOURCES ${ZWIDGET_SOURCES} ${ZWIDGET_SDL2_SOURCES})
 	set(ZWIDGET_DEFINES ${ZWIDGET_DEFINES} -DUSE_SDL2)
 endif()
@@ -234,7 +240,7 @@ target_compile_definitions(zwidget PRIVATE ${ZWIDGET_DEFINES})
 target_include_directories(zwidget PRIVATE ${ZWIDGET_INCLUDE_DIRS})
 target_link_options(zwidget PRIVATE ${ZWIDGET_LINK_OPTIONS})
 target_link_libraries(zwidget PRIVATE ${ZWIDGET_LIBS})
-if(SDL2_FOUND)
+if(SDL2_FOUND AND NOT ZWIDGET_HEADLESS)
 	if(TARGET SDL2::SDL2)
 		target_link_libraries(zwidget PRIVATE SDL2::SDL2)
 	else() # needed for gzdoom compat for now
@@ -281,7 +287,7 @@ if(ZWIDGET_BUILD_EXAMPLE)
 		target_link_libraries(zwidget_example PRIVATE ${ZWIDGET_LIBS})
 	endif()
 
-	if(SDL2_FOUND)
+	if(SDL2_FOUND AND NOT ZWIDGET_HEADLESS)
 		target_link_libraries(zwidget_example PRIVATE SDL2::SDL2)
 	endif()
 

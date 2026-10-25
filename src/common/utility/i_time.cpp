@@ -43,14 +43,26 @@ int GameTicRate = 35;	// make sure it is not 0, even if the client doesn't set i
 
 double TimeScale = 1.0;
 
+#ifdef __LIBRETRO__
+static uint64_t RetroTime = 1;
+#endif
 static uint64_t GetTimePoint()
 {
+#ifdef __LIBRETRO__
+	return RetroTime;
+#else
 	using namespace std::chrono;
 	return (uint64_t)(duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count());
+#endif
 }
 
 void I_InitTime()
 {
+#ifdef __LIBRETRO__
+	RetroTime = 1;
+	FirstFrameStartTime = CurrentFrameStartTime = FreezeTime = 0;
+	lastinputtime = 0;
+#endif
 	StartupTimeNS = GetTimePoint();
 }
 
@@ -103,7 +115,11 @@ void I_WaitVBL(int count)
 	// Instead, it's used for delay purposes. Doom used a 70 Hz display mode,
 	// so that's what we use to determine how long to wait for.
 
+#ifdef __LIBRETRO__
+	RetroTime += uint64_t(count) * 1000000000 / 70;
+#else
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000 * count / 70));
+#endif
 	I_SetFrameTime();
 }
 
@@ -119,6 +135,9 @@ int I_WaitForTic(int prevtic, double const ticrate)
 		// We set this to 1 ms in DoMain.
 
 		const uint64_t next = FirstFrameStartTime + TicToNS(prevtic + 1, ticrate);
+#ifdef __LIBRETRO__
+		RetroTime = StartupTimeNS + uint64_t((next + 1) / TimeScale);
+#else
 		const uint64_t now = I_nsTime();
 
 		if (next > now)
@@ -131,6 +150,7 @@ int I_WaitForTic(int prevtic, double const ticrate)
 			}
 		}
 
+#endif
 		I_SetFrameTime();
 	}
 

@@ -28,7 +28,11 @@
 #include <string.h>
 
 #if defined(__APPLE__)
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_apple_malloc.h"
+#else
 #include <malloc/malloc.h>
+#endif
 #define _msize(p)				malloc_size(p)
 #elif defined(__solaris__) || defined(__OpenBSD__) || defined(__DragonFly__)
 #define _msize(p)				(*((size_t*)(p)-1))

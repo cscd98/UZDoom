@@ -1,3 +1,6 @@
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_resources.h"
+#endif
 /*
 ** findfile.cpp
 **
@@ -62,7 +65,7 @@ bool D_AddFile(std::vector<FileSys::ResourceName>& wadfiles, const char* file, b
 	{
 		return false;
 	}
-#ifdef __unix__
+#if defined(__unix__) && !defined(__LIBRETRO__)
 	// Confirm file exists in filesystem.
 	struct stat info;
 	bool found = stat(file, &info) == 0;
@@ -343,6 +346,10 @@ const char* _BaseFileSearch(FString prefix, const char*file, const char* ext, bo
 
 const char* BaseFileSearch(const char* file, const char* ext, bool lookfirstinprogdir, FConfigFile* config)
 {
+#ifdef __LIBRETRO__
+	if (auto embedded = Libretro::EmbeddedPathForName(file))
+		return embedded;
+#endif
 	if (file == nullptr || *file == '\0')
 	{
 		return nullptr;

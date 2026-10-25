@@ -28,6 +28,9 @@
 #include "v_video.h"
 #include "version.h"
 #include "i_interface.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 
 // Set up 3D-specific console variables:
 CVAR(Int, vr_mode, 0, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
@@ -68,6 +71,10 @@ static float RAD2DEG(float rad)
 const VRMode *VRMode::GetVRMode(bool toscreen)
 {
 	int mode = !toscreen || (sysCallbacks.DisableTextureFilter && sysCallbacks.DisableTextureFilter()) ? 0 : vr_mode;
+
+#ifdef __LIBRETRO__
+	mode = toscreen ? Libretro::StereoMode() : VR_MONO;
+#endif
 
 	switch (mode)
 	{

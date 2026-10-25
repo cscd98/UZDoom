@@ -26,6 +26,9 @@ public:
 	~VulkanSwapChain();
 
 	void Create(int width, int height, int imageCount, bool vsync, bool hdr, bool exclusivefullscreen);
+#ifdef __LIBRETRO__
+	void CreateOffscreen(int width, int height, int count);
+#endif
 	bool Lost() const { return lost; }
 
 	int Width() const { return actualExtent.width; }

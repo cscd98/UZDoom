@@ -97,7 +97,11 @@ class FModule
 	// problems with declaring procedures.
 	StaticProc *reqSymbols;
 
+#ifdef __LIBRETRO__
+	bool Open(const char* lib, bool keepResident);
+#else
 	bool Open(const char* lib);
+#endif
 	void *GetSym(const char* name);
 
 public:
@@ -111,7 +115,11 @@ public:
 
 	// Load a shared library using the first library name which satisfies all
 	// of the required symbols.
+#ifdef __LIBRETRO__
+	bool Load(std::initializer_list<const char*> libnames, bool keepResident = false);
+#else
 	bool Load(std::initializer_list<const char*> libnames);
+#endif
 	void Unload();
 
 	bool IsLoaded() const { return handle != nullptr; }

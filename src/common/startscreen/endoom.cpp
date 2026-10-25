@@ -63,7 +63,7 @@ CUSTOM_CVAR(Int, showendoom, 0, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
 CVAR(Bool, consoleendoom, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 extern bool FancyStdOut;
 #endif
 
@@ -190,7 +190,7 @@ void vga_to_ansi(const uint8_t *buf);
 
 void ConsoleEndoom()
 {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 	// old versions of Windows don't get an ansi endoom
 	if (!FancyStdOut)
 		return;

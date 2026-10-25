@@ -22,6 +22,17 @@ VulkanInstance::VulkanInstance(std::vector<uint32_t> apiVersionsToTry, std::set<
 	}
 }
 
+#ifdef __LIBRETRO__
+VulkanInstance::VulkanInstance(VkInstance instance, PFN_vkGetInstanceProcAddr getProc, uint32_t apiVersion)
+	: ApiVersion(apiVersion), Instance(instance), OwnsInstance(false)
+{
+	ShaderBuilder::Init();
+	volkInitializeCustom(getProc);
+	volkLoadInstance(instance);
+	PhysicalDevices = GetPhysicalDevices(instance, apiVersion);
+}
+#endif
+
 VulkanInstance::~VulkanInstance()
 {
 	ReleaseResources();
@@ -33,7 +44,11 @@ void VulkanInstance::ReleaseResources()
 		vkDestroyDebugUtilsMessengerEXT(Instance, debugMessenger, nullptr);
 	debugMessenger = VK_NULL_HANDLE;
 
+#ifdef __LIBRETRO__
+	if (Instance && OwnsInstance)
+#else
 	if (Instance)
+#endif
 		vkDestroyInstance(Instance, nullptr);
 	Instance = nullptr;
 }

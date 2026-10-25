@@ -1,0 +1,39 @@
+/* Generated for the libretro core. The archive remains compressed in .rodata. */
+#ifdef __APPLE__
+#define uzdoom_pk3_start _uzdoom_pk3_start
+#define uzdoom_pk3_end _uzdoom_pk3_end
+#define game_support_pk3_start _game_support_pk3_start
+#define game_support_pk3_end _game_support_pk3_end
+.section __TEXT,__const
+#elif defined(_WIN32)
+.section .rdata,"dr"
+#else
+.section .rodata.uzdoom_pk3,"a"
+#endif
+.balign 16
+.global uzdoom_pk3_start
+#if !defined(_WIN32) && !defined(__APPLE__)
+.hidden uzdoom_pk3_start
+#endif
+uzdoom_pk3_start:
+.incbin "@ZDOOM_OUTPUT_DIR@/uzdoom.pk3"
+.global uzdoom_pk3_end
+#if !defined(_WIN32) && !defined(__APPLE__)
+.hidden uzdoom_pk3_end
+#endif
+uzdoom_pk3_end:
+.balign 16
+.global game_support_pk3_start
+#if !defined(_WIN32) && !defined(__APPLE__)
+.hidden game_support_pk3_start
+#endif
+game_support_pk3_start:
+.incbin "@ZDOOM_OUTPUT_DIR@/game_support.pk3"
+.global game_support_pk3_end
+#if !defined(_WIN32) && !defined(__APPLE__)
+.hidden game_support_pk3_end
+#endif
+game_support_pk3_end:
+#if !defined(_WIN32) && !defined(__APPLE__)
+.section .note.GNU-stack,""
+#endif

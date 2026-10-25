@@ -419,3 +419,26 @@ VulkanSurfaceCapabilities VulkanSwapChain::GetSurfaceCapabilities(bool exclusive
 
 	return caps;
 }
+
+#ifdef __LIBRETRO__
+void VulkanSwapChain::CreateOffscreen(int width, int height, int count)
+{
+	views.clear();
+	images.clear();
+	actualExtent = {uint32_t(width), uint32_t(height)};
+	format       = {VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+	for (int i = 0; i < count; ++i)
+	{
+		auto image = ImageBuilder()
+		                 .Size(width, height)
+		                 .Format(format.format)
+		                 .Flags(VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT)
+		                 .Usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+		                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+		                 .Create(device);
+		views.push_back(ImageViewBuilder().Image(image.get(), format.format).Create(device));
+		images.push_back(std::move(image));
+	}
+	lost = false;
+}
+#endif

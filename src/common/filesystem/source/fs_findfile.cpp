@@ -1,3 +1,13 @@
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vfs.h"
+#include "common/platform/libretro/retro_resources.h"
+#ifdef _WIN32
+#include <windows.h>
+#include <shlwapi.h>
+#else
+#include <fnmatch.h>
+#endif
+#endif
 /*
 ** fs_findfile.cpp
 **
@@ -329,6 +339,49 @@ static size_t FS_GetFileSize(findstate_t* handle, const char* pathname)
 
 static bool DoScanDirectory(FileList& list, const char* dirpath, const char* match, const char* relpath, bool nosubdir, bool readhidden)
 {
+#ifdef __LIBRETRO__
+	if (auto vfs = Libretro::VFS())
+	{
+		if (!vfs->opendir || !vfs->readdir || !vfs->dirent_get_name || !vfs->dirent_is_dir || !vfs->closedir)
+			return false;
+
+		auto dir = vfs->opendir(dirpath, readhidden);
+		if (!dir)
+			return false;
+
+		while (vfs->readdir(dir))
+		{
+			auto name = vfs->dirent_get_name(dir);
+			if (!name || !strcmp(name, ".") || !strcmp(name, "..") || (!readhidden && name[0] == '.'))
+				continue;
+
+			if (strchr(name, '/') || strchr(name, '\\'))
+				continue;
+
+#ifdef _WIN32
+            if (!PathMatchSpecW(toWide(name).c_str(), toWide(match).c_str()))
+#else
+			if (fnmatch(match, name, 0))
+#endif
+				continue;
+
+			FileListEntry entry;
+			entry.FileName    = name;
+			entry.FilePath    = std::string(dirpath) + "/" + name;
+			entry.FilePathRel = std::string(relpath) + (*relpath ? "/" : "") + name;
+			entry.isDirectory = vfs->dirent_is_dir(dir);
+			entry.isHidden    = name[0] == '.';
+			Libretro::StatVFS(entry.FilePath.c_str(), nullptr, &entry.Length);
+			list.push_back(entry);
+
+			if (entry.isDirectory && !nosubdir)
+				DoScanDirectory(list, entry.FilePath.c_str(), match, entry.FilePathRel.c_str(), false, readhidden);
+		}
+		vfs->closedir(dir);
+
+		return true;
+	}
+#endif
 	findstate_t find;
 
 	std::string dirpathn = dirpath;
@@ -403,6 +456,11 @@ bool FS_DirEntryExists(const char* pathname, bool* isdir)
 	if (pathname == NULL || *pathname == 0)
 		return false;
 
+#ifdef __LIBRETRO__
+	if (Libretro::IsEmbeddedResource(pathname)) return true;
+	if (Libretro::HasVFS())
+		return Libretro::StatVFS(pathname, isdir);
+#endif
 #ifndef _WIN32
 	struct stat info;
 	bool res = stat(pathname, &info) == 0;

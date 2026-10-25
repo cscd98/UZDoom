@@ -26,7 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 // windows platform code uses special stdout handling, let's make sure to use that
 #include <windows.h>
 extern HANDLE StdOut;
@@ -123,7 +123,7 @@ void ibm437_to_utf8(char* result, char in);
 
 void vga_to_ansi(const uint8_t *buf)
 {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 	// FIXME: support for alternative terminals and old windows
 	Support termcaps = Support::FULL;
 #else

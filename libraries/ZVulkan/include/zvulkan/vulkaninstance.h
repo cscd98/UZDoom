@@ -57,6 +57,9 @@ public:
 	VulkanInstance(std::vector<uint32_t> apiVersionsToTry, std::set<std::string> requiredExtensions, std::set<std::string> optionalExtensions, bool wantDebugLayer);
 	~VulkanInstance();
 
+#ifdef __LIBRETRO__
+	VulkanInstance(VkInstance instance, PFN_vkGetInstanceProcAddr getProc, uint32_t apiVersion);
+#endif
 	std::vector<uint32_t> ApiVersionsToTry;
 
 	std::set<std::string> RequiredExtensions;
@@ -76,6 +79,9 @@ public:
 	bool DebugLayerActive = false;
 
 private:
+#ifdef __LIBRETRO__
+	bool OwnsInstance = true;
+#endif
 	bool WantDebugLayer = false;
 	VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 

@@ -28,6 +28,10 @@
 #include <assert.h>
 #include <string.h>
 #include "files_internal.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vfs.h"
+#include "common/platform/libretro/retro_resources.h"
+#endif
 #include "m_crc32.h"
 #include "engineerrors.h"
 
@@ -39,6 +43,10 @@ std::wstring toWide(const char* str);
 
 FILE *myfopen(const char *filename, const char *flags)
 {
+#ifdef __LIBRETRO__
+	if (Libretro::HasVFS())
+		return Libretro::OpenVFSFile(filename, flags);
+#endif
 #ifndef _WIN32
 	return fopen(filename, flags);
 #else
@@ -359,6 +367,34 @@ char* BufferingReader::Gets(char* strbuf, ptrdiff_t len)
 
 bool FileReader::OpenFile(const char *filename, FileReader::Size start, FileReader::Size length, bool buffered)
 {
+#ifdef __LIBRETRO__
+	if (Libretro::IsEmbeddedResource(filename))
+	{
+		auto size = static_cast<Size>(Libretro::EmbeddedResourceSize(filename));
+		if (start < 0 || start > size || length < -1)
+			return false;
+
+		auto available = size - start;
+		return OpenMemory(Libretro::EmbeddedResourceData(filename) + start,
+			length < 0 ? available : std::min(length, available));
+	}
+	if (Libretro::HasVFS())
+	{
+		auto reader = Libretro::OpenVFSReader(filename, start, length);
+
+		if (!reader)
+			return false;
+
+		Close();
+
+		if (buffered)
+			mReader = new BufferingReader(reader);
+		else
+			mReader = reader;
+
+		return true;
+	}
+#endif
 	auto reader = new StdFileReader;
 	if (!reader->Open(filename, start, length))
 	{
@@ -435,6 +471,9 @@ bool FileWriter::OpenDirect(const char *filename)
 
 FileWriter *FileWriter::Open(const char *filename)
 {
+#ifdef __LIBRETRO__
+	if (Libretro::HasVFS()) return Libretro::OpenVFSWriter(filename);
+#endif
 	FileWriter *fwrit = new FileWriter();
 	if (fwrit->OpenDirect(filename))
 	{

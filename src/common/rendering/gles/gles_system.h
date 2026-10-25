@@ -85,7 +85,7 @@
 	#include "gl_load/gl_load.h"
 #endif
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && !defined(__LIBRETRO__)
 	#include <OpenGL/OpenGL.h>
 #endif
 

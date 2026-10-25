@@ -87,7 +87,7 @@ FARG(config, "Configuration", "Specifies an alternative configuration file to us
 	"Causes " GAMENAME " to use an alternative configuration file. If configfile does not exist,"
 	" it will be created.");
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 EXTERN_CVAR (Int, in_mouse)
 #endif
 
@@ -657,7 +657,7 @@ void FGameConfigFile::DoGlobalSetup ()
 		if (EngineLastRunVer < 221)
 		{
 			// Transfer the messed up mouse scaling config to something sane and consistent.
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__LIBRETRO__)
 			double xfact = 3, yfact = 2;
 #else
 			double xfact = in_mouse == 1? 1.5 : 4, yfact = 1;

@@ -26,7 +26,11 @@
 #include <malloc_np.h>
 #elif defined(__APPLE__)
 #include <stdlib.h>
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_apple_malloc.h"
+#else
 #include <malloc/malloc.h>
+#endif
 #elif defined(__OpenBSD__) || defined(__DragonFly__)
 #include <stdlib.h>
 #else

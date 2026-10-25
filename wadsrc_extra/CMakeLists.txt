@@ -4,3 +4,7 @@ generate_language_files(game_support_pk3 static/language.csv GAMES)
 generate_language_files(game_support_pk3 static/filter/chex.chex3/language.csv GAMES_CHEX3)
 generate_language_files(game_support_pk3 static/filter/harmony/language.csv GAMES_HARMONY)
 generate_language_files(game_support_pk3 static/filter/hacx.hacx1/after_iwad/language.csv GAMES_HACX)
+
+if(ENABLE_LIBRETRO)
+    add_dependencies(zdoom game_support_pk3)
+endif()

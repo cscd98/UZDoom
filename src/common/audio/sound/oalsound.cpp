@@ -100,7 +100,11 @@ bool IsOpenALPresent()
 	if (!done)
 	{
 		done = true;
+#ifdef __LIBRETRO__
+		cached_result = OpenALModule.Load({OPENALLIB1, OPENALLIB2}, true);
+#else
 		cached_result = OpenALModule.Load({OPENALLIB1, OPENALLIB2});
+#endif
 	}
 	return cached_result;
 #endif
@@ -581,6 +585,12 @@ void trysetenv(const char *k, const char *v)
 
 ALCdevice *OpenALSoundRenderer::InitDevice()
 {
+#ifdef __LIBRETRO__
+	if (!IsOpenALPresent() || !alcIsExtensionPresent(nullptr, "ALC_SOFT_loopback"))
+		return nullptr;
+	auto open = reinterpret_cast<LPALCLOOPBACKOPENDEVICESOFT>(alcGetProcAddress(nullptr, "alcLoopbackOpenDeviceSOFT"));
+	return open ? open(nullptr) : nullptr;
+#else
 	// allow setting this from game
 	trysetenv("ALSOFT_DRIVERS", snd_aldriver);
 
@@ -608,6 +618,7 @@ ALCdevice *OpenALSoundRenderer::InitDevice()
 		Printf(TEXTCOLOR_ORANGE"Failed to load soft_oal.dll\n");
 	}
 	return device;
+#endif
 }
 
 
@@ -655,11 +666,20 @@ OpenALSoundRenderer::OpenALSoundRenderer()
 	DPrintf(DMSG_SPAMMY, "  ALC Extensions: " TEXTCOLOR_ORANGE"%s\n", alcGetString(Device, ALC_EXTENSIONS));
 
 	TArray<ALCint> attribs;
+#ifdef __LIBRETRO__
+	attribs.Push(ALC_FORMAT_CHANNELS_SOFT);
+	attribs.Push(ALC_STEREO_SOFT);
+	attribs.Push(ALC_FORMAT_TYPE_SOFT);
+	attribs.Push(ALC_SHORT_SOFT);
+	attribs.Push(ALC_FREQUENCY);
+	attribs.Push(48000);
+#else
 	if(*snd_samplerate > 0)
 	{
 		attribs.Push(ALC_FREQUENCY);
 		attribs.Push(*snd_samplerate);
 	}
+#endif
 	// Make sure one source is capable of stereo output with the rest doing
 	// mono, without running out of voices
 	attribs.Push(ALC_MONO_SOURCES);
@@ -965,6 +985,29 @@ OpenALSoundRenderer::~OpenALSoundRenderer()
 	Device = NULL;
 }
 
+#ifdef __LIBRETRO__
+void OpenALSoundRenderer::RenderSamples(int16_t *samples, unsigned frames)
+{
+	if (!Device || !Context)
+		return;
+
+	auto render = reinterpret_cast<LPALCRENDERSAMPLESSOFT>(alcGetProcAddress(Device, "alcRenderSamplesSOFT"));
+	if (!render)
+		return;
+
+	while (frames)
+	{
+		for (auto stream : Streams)
+			stream->Process();
+
+		unsigned count = std::min(frames, 256u);
+		render(Device, samples, count);
+		samples += count * 2;
+		frames -= count;
+	}
+}
+#endif
+
 void OpenALSoundRenderer::BackgroundProc()
 {
 	std::unique_lock<std::mutex> lock(StreamLock);
@@ -1263,8 +1306,10 @@ void OpenALSoundRenderer::UnloadSound(SoundHandle sfx)
 
 SoundStream *OpenALSoundRenderer::CreateStream(SoundStreamCallback callback, int buffbytes, SampleType stype, ChannelConfig chans, int samplerate, void *userdata)
 {
+#ifndef __LIBRETRO__
 	if(StreamThread.get_id() == std::thread::id())
 		StreamThread = std::thread(std::mem_fn(&OpenALSoundRenderer::BackgroundProc), this);
+#endif
 	OpenALSoundStream *stream = new OpenALSoundStream(this);
 	if (!stream->Init(callback, buffbytes, stype, chans, samplerate, userdata))
 	{
@@ -2163,7 +2208,7 @@ void I_BuildALDeviceList(FOptionValues* opt)
 	opt->mValues[0].TextValue = "Default";
 	opt->mValues[0].Text = "Default";
 
-#ifndef NO_OPENAL
+#if !defined(NO_OPENAL) && !defined(__LIBRETRO__)
 	if (IsOpenALPresent())
 	{
 		const ALCchar* names = (alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ?

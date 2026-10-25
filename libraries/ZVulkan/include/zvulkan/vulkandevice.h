@@ -21,6 +21,10 @@ public:
 	VulkanDevice(std::shared_ptr<VulkanInstance> instance, std::shared_ptr<VulkanSurface> surface, const VulkanCompatibleDevice& selectedDevice);
 	~VulkanDevice();
 
+#ifdef __LIBRETRO__
+	VulkanDevice(std::shared_ptr<VulkanInstance> instance, VkPhysicalDevice gpu, VkDevice borrowed, VkQueue queue,
+				 unsigned family, const VkPhysicalDeviceFeatures &features);
+#endif
 	std::set<std::string> EnabledDeviceExtensions;
 	VulkanDeviceFeatures EnabledFeatures;
 
@@ -44,6 +48,9 @@ public:
 	void SetObjectName(const char* name, uint64_t handle, VkObjectType type);
 
 private:
+#ifdef __LIBRETRO__
+	bool OwnsDevice = true;
+#endif
 	bool DebugLayerActive = false;
 
 	void CreateDevice();

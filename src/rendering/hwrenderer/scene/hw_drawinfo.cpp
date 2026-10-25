@@ -15,6 +15,9 @@
 **
 */
 
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include "a_sharedglobal.h"
 #include "r_utility.h"
 #include "r_sky.h"
@@ -924,6 +927,9 @@ void HWDrawInfo::DrawCoronas(FRenderState& state)
 void HWDrawInfo::EndDrawScene(sector_t * viewsector, FRenderState &state)
 {
 	state.EnableFog(false);
+#ifdef __LIBRETRO__
+	Libretro::DrawVRLaser(Viewpoint, state);
+#endif
 
 	/*if (gl_coronas && Coronas.Size() > 0)
 	{
@@ -959,6 +965,9 @@ void HWDrawInfo::DrawEndScene2D(sector_t * viewsector, FRenderState &state)
 	HWViewpointUniforms vp = VPUniforms;
 	vp.ViewMatrix.loadIdentity();
 	vp.ProjectionMatrix = vrmode->GetHUDSpriteProjection();
+#ifdef __LIBRETRO__
+    Libretro::ApplyVRHUD(vp.ProjectionMatrix, screen->GetWidth(), screen->GetHeight(), true);
+#endif
 	screen->mViewpoints->SetViewpoint(state, &vp);
 	state.EnableDepthTest(false);
 	state.EnableMultisampling(false);

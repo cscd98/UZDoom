@@ -1,3 +1,7 @@
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vfs.h"
+#include "common/platform/libretro/retro_resources.h"
+#endif
 /*
 ** cmdlib.cpp
 **
@@ -182,6 +186,21 @@ FString RecursiveFileExists(const FString& path, const FString& file)
 
 bool FileReadable(const char *filename)
 {
+#ifdef __LIBRETRO__
+	if (Libretro::IsEmbeddedResource(filename))
+		return true;
+	
+	if (Libretro::HasVFS())
+	{
+		const auto vfs = Libretro::VFS();
+		auto file = vfs->open(filename, RETRO_VFS_FILE_ACCESS_READ, 0);
+		if (!file)
+			return false;
+
+		vfs->close(file);
+		return true;
+	}
+#endif
 #ifndef _WIN32
 	return access (filename, R_OK) == 0;
 #else
@@ -219,6 +238,13 @@ bool DirEntryExists(const char *pathname, bool *isdir)
 	if (pathname == NULL || *pathname == 0)
 		return false;
 
+#ifdef __LIBRETRO__
+	if (Libretro::IsEmbeddedResource(pathname))
+		return true;
+
+	if (Libretro::HasVFS())
+		return Libretro::StatVFS(pathname, isdir);
+#endif
 #ifndef _WIN32
 	struct stat info;
 	bool res = stat(pathname, &info) == 0;
@@ -245,6 +271,25 @@ bool GetFileInfo(const char* pathname, size_t *size, time_t *time)
 	if (pathname == NULL || *pathname == 0)
 		return false;
 
+#ifdef __LIBRETRO__
+	if (Libretro::IsEmbeddedResource(pathname))
+	{
+		if (size)
+			*size = Libretro::EmbeddedResourceSize(pathname);
+		if (time) *time = 0;
+
+		return true;
+	}
+
+	if (Libretro::HasVFS())
+	{
+		bool directory = false;
+		if (time)
+			*time = 0;
+
+		return Libretro::StatVFS(pathname, &directory, size) && !directory;
+	}
+#endif
 #ifndef _WIN32
 	struct stat info;
 	bool res = stat(pathname, &info) == 0;

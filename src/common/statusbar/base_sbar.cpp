@@ -23,6 +23,9 @@
 */
 
 #include <cassert>
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 
 #include "base_sbar.h"
 #include "basics.h"
@@ -129,6 +132,9 @@ void ST_UnloadCrosshair()
 
 void ST_DrawCrosshair(int phealth, double xpos, double ypos, double scale, DAngle angle)
 {
+#ifdef __LIBRETRO__
+	if (Libretro::VRActive()) return;
+#endif
 	FRenderStyle style {{ STYLEOP_Add, STYLEALPHA_Src, STYLEALPHA_InvSrc, STYLEF_RedIsAlpha | STYLEF_ColorIsFixed }};
 	uint32_t color;
 	double size;

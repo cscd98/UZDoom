@@ -35,6 +35,9 @@
 #include "v_video.h"
 
 #include "hw_vrmodes.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include "v_draw.h"
 
 extern bool vid_hdr_active;
@@ -70,6 +73,35 @@ void FGLRenderer::PostProcessScene(int fixedcm, float flash, const std::function
 
 void FGLRenderer::Flush()
 {
+#ifdef __LIBRETRO__
+    if (VRMode::GetVRMode(true)->mEyeCount == 2)
+    {
+        for (int eye = 0; eye < 2; ++eye)
+        {
+            mBuffers->SelectEye(eye);
+            mBuffers->BindCurrentFB();
+            Libretro::SetVROverlayEye(eye);
+            screen->Draw2D();
+            Libretro::SetVROverlayEye(-1);
+        }
+
+        twod->Clear();
+        FGLPostProcessState savedState;
+        savedState.SaveTextureBindings(2);
+        mBuffers->BindOutputFB();
+        ClearBorders();
+        IntRect box = screen->mOutputLetterbox;
+        box.width /= 2;
+
+        for (int eye = 0; eye < 2; ++eye)
+        {
+            mBuffers->BindEyeTexture(eye, 0);
+            DrawPresentTexture(box, true);
+            box.left += box.width;
+        }
+        return;
+    }
+#endif
 	CopyToBackbuffer(nullptr, true);
 }
 

@@ -50,13 +50,25 @@ static const char* const libnames[] = { "libsndfile.1.dylib" };
 static const char* const libnames[] = { "libsndfile.so.1" };
 #endif
 
+#ifdef __LIBRETRO__
+static bool cached_result = false;
+static bool done = false;
+void LibretroUnloadSndFile()
+{
+    SndFileModule.Unload();
+    cached_result = done = false;
+}
+#endif
+
 extern "C" int IsSndFilePresent()
 {
 #if !defined DYN_SNDFILE
 	return true;
 #else
+#ifndef __LIBRETRO__
 	static bool cached_result = false;
 	static bool done = false;
+#endif
 
 	if (!done)
 	{
@@ -266,3 +278,7 @@ extern "C" int sf_close(SNDFILE * sndfile)
 
 #endif
 
+
+#if defined(__LIBRETRO__) && !defined(HAVE_SNDFILE)
+void LibretroUnloadSndFile() {}
+#endif

@@ -1778,6 +1778,13 @@ static void P_RollbackPlayers(FSerializer& arc)
 	arc.EndArray();
 }
 
+#ifdef __LIBRETRO__
+int P_LibretroPlayerCommandTic()
+{
+	return NetworkEntityManager::IsPredicting() ? PredictionData.LastPredictedTic : gametic;
+}
+#endif
+
 void P_PredictClient()
 {
 	if (gamestate != GS_LEVEL)

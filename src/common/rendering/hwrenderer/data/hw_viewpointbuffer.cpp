@@ -15,6 +15,9 @@
 **
 */
 
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include "hwrenderer/data/shaderuniforms.h"
 #include "hw_viewpointuniforms.h"
 #include "hw_renderstate.h"
@@ -86,6 +89,9 @@ void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 	matrices.mLightBlendMode = 0;
 
 	matrices.ProjectionMatrix.ortho(0, (float)width, (float)height, 0, -1.0f, 1.0f);
+#ifdef __LIBRETRO__
+    Libretro::ApplyVRHUD(matrices.ProjectionMatrix, width, height);
+#endif
 	matrices.CalcDependencies();
 
 	CheckSize();

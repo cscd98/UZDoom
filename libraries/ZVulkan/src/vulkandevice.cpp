@@ -30,6 +30,22 @@ VulkanDevice::VulkanDevice(std::shared_ptr<VulkanInstance> instance, std::shared
 	}
 }
 
+#ifdef __LIBRETRO__
+VulkanDevice::VulkanDevice(std::shared_ptr<VulkanInstance> instance, VkPhysicalDevice gpu, VkDevice borrowed,
+                           VkQueue queue, unsigned family, const VkPhysicalDeviceFeatures &features)
+	: Instance(instance), device(borrowed), GraphicsQueue(queue), PresentQueue(queue), GraphicsFamily(family),
+	  PresentFamily(family), OwnsDevice(false)
+{
+	for (const auto &physical : instance->PhysicalDevices)
+		if (physical.Device == gpu)
+			PhysicalDevice = physical;
+	EnabledFeatures.Features = features;
+	GraphicsTimeQueries      = PhysicalDevice.QueueFamilies.at(family).timestampValidBits != 0;
+	volkLoadDevice(device);
+	CreateAllocator();
+}
+#endif
+
 VulkanDevice::~VulkanDevice()
 {
 	ReleaseResources();
@@ -145,7 +161,11 @@ void VulkanDevice::ReleaseResources()
 	if (allocator)
 		vmaDestroyAllocator(allocator);
 
+#ifdef __LIBRETRO__
+	if (device && OwnsDevice)
+#else
 	if (device)
+#endif
 		vkDestroyDevice(device, nullptr);
 	device = nullptr;
 }

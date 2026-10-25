@@ -1,3 +1,6 @@
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_platform.h"
+#endif
 /*
 ** d_main.cpp
 **
@@ -1585,6 +1588,10 @@ void D_ErrorCleanup ()
 
 void D_DoomLoop ()
 {
+#ifdef __LIBRETRO__
+	Libretro::RegisterOptions(true);
+	Libretro::ApplyOptions();
+#endif
 	int lasttic = 0;
 
 	// Clamp the timer to TICRATE until the playloop has been entered.
@@ -1615,6 +1622,10 @@ void D_DoomLoop ()
 			D_ProcessEvents();
 			D_Display ();
 			S_UpdateMusic();
+#ifdef __LIBRETRO__
+			extern void LibretroEndFrame();
+			LibretroEndFrame();
+#endif
 
 			if (gameloop_abort)
 			{
@@ -4157,7 +4168,9 @@ static int D_DoomMain_Internal (void)
 		System_DisableAnisotropicFiltering
 	};
 
+#ifndef __LIBRETRO__
 	std::set_new_handler(NewFailure);
+#endif
 	const char *batchout = Args->CheckValue(FArg_errorlog);
 
 	D_DoomInit();
@@ -4369,6 +4382,7 @@ void SignalHandler(int signal)
 
 int GameMain()
 {
+#ifndef __LIBRETRO__
 	// On Windows, prefer the native win32 backend.
 	// On other platforms, use SDL until the other backends are more mature.
 	auto zwidget = DisplayBackend::TryCreateWin32();
@@ -4380,6 +4394,7 @@ int GameMain()
 		return -1;
 	}
 	DisplayBackend::Set(std::move(zwidget));
+#endif
 
 	int ret = 0;
 	GameTicRate = TICRATE;

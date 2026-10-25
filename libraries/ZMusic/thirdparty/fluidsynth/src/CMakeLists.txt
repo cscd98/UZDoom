@@ -154,7 +154,12 @@ target_include_directories ( fluidsynth PRIVATE
 )
 
 
-if (NOT WIN32)
+if(ENABLE_LIBRETRO)
+   target_compile_definitions(fluidsynth PRIVATE __LIBRETRO__)
+endif()
+if(ENABLE_LIBRETRO AND (ANDROID OR APPLE))
+   target_include_directories(fluidsynth PRIVATE "${CMAKE_SOURCE_DIR}/src/common/platform/libretro/fluidsynth")
+elseif (NOT WIN32)
    find_package(PkgConfig REQUIRED)
    pkg_search_module(GLIB REQUIRED glib-2.0)
    target_include_directories ( fluidsynth PUBLIC ${GLIB_INCLUDE_DIRS} )

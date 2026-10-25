@@ -36,6 +36,9 @@
 #include "v_video.h"
 
 #include "hw_vrmodes.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include "v_draw.h"
 
 #include "i_time.h"
@@ -128,7 +131,13 @@ void FGLRenderer::Flush()
 		int eyeCount = vrmode->mEyeCount;
 		for (int eye_ix = 0; eye_ix < eyeCount; ++eye_ix)
 		{
+#ifdef __LIBRETRO__
+            Libretro::SetVROverlayEye(mBuffers->CurrentEye());
+#endif
 			screen->Draw2D();
+#ifdef __LIBRETRO__
+            Libretro::SetVROverlayEye(-1);
+#endif
 			if (eyeCount - eye_ix > 1)
 				mBuffers->NextEye(eyeCount);
 		}

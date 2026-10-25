@@ -1,0 +1,45 @@
+name: Build UZDoom (libretro) on macOS
+
+on: [push, pull_request]
+
+env:
+  core_id: uzdoom_libretro
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: "macOS arm64"
+          os: macos-latest
+          ZIP_NAME_SUFFIX: macos_arm64
+
+    steps:
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install dylibbundler openal-soft cmake fluid-synth \
+          libvpx mbedtls molten-vk vulkan-volk zlib ninja
+
+    - name: Checkout UZDoom (libretro) repo
+      uses: actions/checkout@v7
+      with:
+        path: ${{ env.core_id }}
+        submodules: recursive
+
+    - name: Configure
+      run: |
+        cd ${{ env.core_id }}
+
+        cmake -S . -B build -G Ninja \
+          -DENABLE_LIBRETRO=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DFORCE_NO_LTO=ON \
+          -DHAVE_VULKAN=OFF \
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install"
+
+    - name: Build
+      run: |
+        cmake --build ${{ env.core_id }}/build --parallel "$(sysctl -n hw.ncpu)"

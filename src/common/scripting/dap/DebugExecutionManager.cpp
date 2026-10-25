@@ -26,7 +26,7 @@
 #include <thread>
 // #include "Window.h"
 #include "GameInterfaces.h"
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 extern void I_GetWindowEvent();
 extern bool win32EnableInput;
 #endif
@@ -232,19 +232,19 @@ void DebugExecutionManager::WaitWhilePaused(pauseReason pauseReason, VMFrameStac
 	{
 		if (pauseReason > pauseReason::NONE)
 		{
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 			win32EnableInput = false;
 #endif
 
 			while (m_state == DebuggerState::kPaused)
 			{
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 				I_GetWindowEvent();
 #endif
 				using namespace std::chrono_literals;
 				std::this_thread::sleep_for(100ms);
 			}
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 			win32EnableInput = true;
 #endif
 		}

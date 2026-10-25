@@ -27,6 +27,9 @@
 #include "vulkan/system/vk_renderdevice.h"
 #include "vulkan/renderer/vk_postprocess.h"
 #include "vk_framebuffer.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_platform.h"
+#endif
 
 CVAR(Bool, vk_hdr, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
 CVAR(Bool, vk_exclusivefullscreen, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG);
@@ -47,6 +50,44 @@ VkFramebufferManager::~VkFramebufferManager()
 
 void VkFramebufferManager::AcquireImage()
 {
+#ifdef __LIBRETRO__
+	auto host = Libretro::Vulkan;
+	host->wait_sync_index(host->handle);
+	if (SwapChain->Lost())
+	{
+		unsigned mask  = host->get_sync_index_mask(host->handle);
+		unsigned count = 0;
+		while (mask)
+		{
+			++count;
+			mask >>= 1;
+		}
+		if (!count)
+			throw std::runtime_error("Invalid Vulkan sync index mask");
+
+		SwapChain->CreateOffscreen(fb->GetClientWidth(), fb->GetClientHeight(), count);
+		RetroImages.resize(count);
+
+		for (unsigned i = 0; i < count; ++i)
+		{
+			auto &image                        = RetroImages[i];
+			image.image_view                   = SwapChain->GetImageView(i)->view;
+			image.image_layout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			image.create_info.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			image.create_info.image            = SwapChain->GetImage(i)->image;
+			image.create_info.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+			image.create_info.format           = SwapChain->Format().format;
+			image.create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+			RenderFinishedSemaphores.push_back(SemaphoreBuilder().Create(fb->device.get()));
+		}
+	}
+
+	PresentImageIndex = host->get_sync_index(host->handle);
+	if (unsigned(PresentImageIndex) >= RetroImages.size())
+		throw std::runtime_error("Invalid Vulkan sync index");
+
+	fb->GetPostprocess()->DrawPresentTexture(fb->mOutputLetterbox, true, false);
+#else
 	bool exclusiveFullscreen = fb->IsFullscreen() && vk_exclusivefullscreen;
 	if (SwapChain->Lost() || fb->GetClientWidth() != CurrentWidth || fb->GetClientHeight() != CurrentHeight || fb->GetVSync() != CurrentVSync || CurrentHdr != vk_hdr || CurrentExclusiveFullscreen != exclusiveFullscreen)
 	{
@@ -74,10 +115,23 @@ void VkFramebufferManager::AcquireImage()
 	{
 		fb->GetPostprocess()->DrawPresentTexture(fb->mOutputLetterbox, true, false);
 	}
+#endif
 }
 
 void VkFramebufferManager::QueuePresent()
 {
+#ifdef __LIBRETRO__
+	if (PresentImageIndex == -1)
+		return;
+
+	auto host      = Libretro::Vulkan;
+	auto semaphore = RenderFinishedSemaphores[PresentImageIndex]->semaphore;
+
+	host->set_image(host->handle, &RetroImages[PresentImageIndex], 1, &semaphore, VK_QUEUE_FAMILY_IGNORED);
+
+	Libretro::Present();
+#else
 	if (PresentImageIndex != -1)
 		SwapChain->QueuePresent(PresentImageIndex, RenderFinishedSemaphores[PresentImageIndex].get());
+#endif
 }

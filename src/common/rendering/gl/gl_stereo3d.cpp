@@ -26,6 +26,9 @@
 #include "gl_renderer.h"
 #include "gl_renderbuffers.h"
 #include "hw_vrmodes.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 #include "gl_framebuffer.h"
 #include "gl_postprocessstate.h"
 #include "gl_framebuffer.h"
@@ -42,7 +45,7 @@ EXTERN_CVAR(Float, vid_contrast)
 EXTERN_CVAR(Int, gl_satformula)
 EXTERN_CVAR(Int, gl_dither_bpc)
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 EXTERN_CVAR(Bool, vr_enable_quadbuffered)
 #endif
 
@@ -57,7 +60,7 @@ void UpdateVRModes(bool considerQuadBuffered)
 	for (int i = 0; i < cnt; ++i) {
 		auto const& mode = vals[i];
 		if (mode.Value == 7) {  // Quad-buffered stereo
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 			if (!vr_enable_quadbuffered) continue;
 #else
 			continue;  // Remove quad-buffered option on Mac and Linux
@@ -403,6 +406,9 @@ void FGLRenderer::PresentStereo()
 	if (eyeCount > 1)
 		mBuffers->BlitToEyeTexture(mBuffers->CurrentEye(), false);
 
+#ifdef __LIBRETRO__
+    const int vr_mode = Libretro::StereoMode();
+#endif
 	switch (vr_mode)
 	{
 	default:

@@ -24,6 +24,9 @@
 
 #include "zvulkan/vulkanobjects.h"
 #include <array>
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vulkan.h"
+#endif
 #include <map>
 #include <vector>
 
@@ -44,6 +47,9 @@ public:
 
 	std::shared_ptr<VulkanSwapChain> SwapChain;
 	int PresentImageIndex = -1;
+#ifdef __LIBRETRO__
+	std::vector<retro_vulkan_image> RetroImages;
+#endif
 
 	std::unique_ptr<VulkanSemaphore> SwapChainImageAvailableSemaphore;
 	std::vector<std::unique_ptr<VulkanSemaphore>> RenderFinishedSemaphores;

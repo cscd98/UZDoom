@@ -48,11 +48,19 @@
 using HMODULE = void*;
 #endif
 
+#ifdef __LIBRETRO__
+bool FModule::Load(std::initializer_list<const char*> libnames, bool keepResident)
+#else
 bool FModule::Load(std::initializer_list<const char*> libnames)
+#endif
 {
 	for(auto lib : libnames)
 	{
+#ifdef __LIBRETRO__
+		if(!Open(lib, keepResident))
+#else
 		if(!Open(lib))
+#endif
 			continue;
 
 		StaticProc *proc;
@@ -81,7 +89,11 @@ void FModule::Unload()
 	}
 }
 
+#ifdef __LIBRETRO__
+bool FModule::Open(const char* lib, bool keepResident)
+#else
 bool FModule::Open(const char* lib)
+#endif
 {
 #ifdef _WIN32
 	if((handle = GetModuleHandleA(lib)) != nullptr)
@@ -91,7 +103,16 @@ bool FModule::Open(const char* lib)
 	if(*lib == '\0')
 		return false;
 #endif
+#ifdef __LIBRETRO__
+#if defined(__linux__) && defined(RTLD_NODELETE)
+	handle = dlopen(lib, RTLD_LAZY | (keepResident ? RTLD_NODELETE : 0));
+#else
+	(void)keepResident;
 	handle = LoadLibraryA(lib);
+#endif
+#else
+	handle = LoadLibraryA(lib);
+#endif
 	return handle != nullptr;
 }
 

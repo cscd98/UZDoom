@@ -41,6 +41,9 @@
 #include "hwrenderer/scene/hw_clipper.h"
 #include "hwrenderer/scene/hw_portal.h"
 #include "hw_vrmodes.h"
+#ifdef __LIBRETRO__
+#include "common/platform/libretro/retro_vr.h"
+#endif
 
 EXTERN_CVAR(Bool, cl_capfps)
 extern bool NoInterpolateView;
@@ -160,7 +163,19 @@ sector_t* RenderViewpoint(FRenderViewpoint& mainvp, AActor* camera, IntRect* bou
 		di->ProjectionMatrix2 = eye.GetProjection(fov, ratio, fovratio, false); // Regular ol' perspective projection matrix
 
 		// Stereo mode specific viewpoint adjustment
-		vp.Pos += eye.GetViewShift(vp.HWAngles.Yaw.Degrees());
+#ifdef __LIBRETRO__
+        if (mainview && toscreen && Libretro::ApplyVREye(eye_ix, vp, di->VPUniforms.ProjectionMatrix))
+        {
+            di->ProjectionMatrix2 = di->VPUniforms.ProjectionMatrix;
+            di->SetViewArea();
+        }
+        else
+        {
+            vp.Pos += eye.GetViewShift(vp.HWAngles.Yaw.Degrees());
+        }
+#else
+        vp.Pos += eye.GetViewShift(vp.HWAngles.Yaw.Degrees());
+#endif
 		di->SetupView(RenderState, vp.Pos.X, vp.Pos.Y, vp.Pos.Z, false, false);
 
 		di->ProcessScene(toscreen);

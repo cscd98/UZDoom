@@ -671,6 +671,10 @@ int FIWadManager::IdentifyVersion (std::vector<FileSys::ResourceName>&wadfiles, 
 			FixPathSeperator(custwad);
 			DefaultExtension(custwad, ext);
 			bool isAbsolute = (custwad[0] == '/');
+#ifdef __LIBRETRO__
+			// Frontend VFS URLs are complete paths, not IWAD search-path names.
+			isAbsolute |= strstr(custwad.GetChars(), "://") != nullptr;
+#endif
 #ifdef _WIN32
 			isAbsolute |= (custwad.Len() >= 2 && custwad[1] == ':');
 #endif

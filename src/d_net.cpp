@@ -2203,6 +2203,9 @@ void TryRunTics()
 	if (!netgame && !AppActive && vid_lowerinbackground)
 		doWait = true;
 
+#ifdef __LIBRETRO__
+	doWait = true; // One simulated tic per frontend frame, including fast-forward.
+#endif
 	// Get the full number of tics the client can run.
 	if (doWait)
 		EnterTic = I_WaitForTic(LastEnterTic);

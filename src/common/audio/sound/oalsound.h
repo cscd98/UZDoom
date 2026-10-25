@@ -43,6 +43,9 @@
 #else
 #include "al.h"
 #include "alc.h"
+#ifdef __LIBRETRO__
+#include "alext.h"
+#endif
 #endif
 
 #include "thirdparty/alext.h"
@@ -55,6 +58,9 @@ class OpenALSoundRenderer final : public SoundRenderer
 public:
 	OpenALSoundRenderer();
 	virtual ~OpenALSoundRenderer();
+#ifdef __LIBRETRO__
+	void RenderSamples(int16_t *samples, unsigned frames) override;
+#endif
 
 	virtual void SetSfxVolume(float volume);
 	virtual void SetMusicVolume(float volume);

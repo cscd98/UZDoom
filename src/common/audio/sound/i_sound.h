@@ -86,6 +86,11 @@ public:
 	SoundRenderer ();
 	virtual ~SoundRenderer ();
 
+#ifdef __LIBRETRO__
+	virtual void RenderSamples(int16_t *samples, unsigned frames)
+	{
+	}
+#endif
 	virtual bool IsNull() { return false; }
 	virtual void SetSfxVolume (float volume) = 0;
 	virtual void SetMusicVolume (float volume) = 0;

@@ -19,6 +19,11 @@
 
 #include <string>
 
+#ifdef __LIBRETRO__
+#undef major
+#undef minor
+#endif
+
 class FString;
 
 struct VersionInfo

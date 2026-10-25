@@ -251,6 +251,9 @@ void DFrameBuffer::ScaleCoordsFromWindow(int16_t &x, int16_t &y)
 
 void DFrameBuffer::FPSLimit()
 {
+#ifdef __LIBRETRO__
+	return; // Presentation pacing belongs to the frontend.
+#endif
 	using namespace std::chrono;
 	using namespace std::this_thread;
 

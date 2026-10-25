@@ -33,6 +33,9 @@
 #include <random>
 
 EXTERN_CVAR(Int, gl_debug_level)
+#ifdef __LIBRETRO__
+extern "C" void *LibretroGLGetProcAddress(const char *name);
+#endif
 
 namespace OpenGLESRenderer
 {
@@ -58,11 +61,19 @@ namespace OpenGLESRenderer
 	{
 		ClearScene();
 
+#ifdef __LIBRETRO__
+        DeleteTexture(mSceneTex);
+#endif
 		DeleteTexture(mDitherTexture);
 	}
 
 	void FGLRenderBuffers::ClearScene()
 	{
+#ifdef __LIBRETRO__
+        SelectEye(0);
+        DeleteFrameBuffer(mOtherEyeFB);
+        DeleteTexture(mOtherEyeTex);
+#endif
 		DeleteFrameBuffer(mSceneFB);
 		DeleteRenderBuffer(mSceneDepthStencilBuf);
 		DeleteRenderBuffer(mSceneStencilBuf);
@@ -107,10 +118,43 @@ namespace OpenGLESRenderer
 		glActiveTexture(GL_TEXTURE0);
 		glGetIntegerv(GL_TEXTURE_BINDING_2D, &textureBinding);
 
-		if (width != mWidth || height != mHeight)
-			CreatePipeline(width, height);
+#ifdef __LIBRETRO__
+        if (!mMSAAInitialized)
+        {
+            mMSAAInitialized = true;
+            const char *extensions = reinterpret_cast<const char *>(glGetString(GL_EXTENSIONS));
+            if (extensions && strstr(extensions, "GL_EXT_multisampled_render_to_texture"))
+            {
+                mMultisampleStorage = reinterpret_cast<MultisampleStorage>(LibretroGLGetProcAddress("glRenderbufferStorageMultisampleEXT"));
+                mMultisampleTexture = reinterpret_cast<MultisampleTexture>(LibretroGLGetProcAddress("glFramebufferTexture2DMultisampleEXT"));
+                if (mMultisampleStorage && mMultisampleTexture) glGetIntegerv(0x8D57 /* GL_MAX_SAMPLES_EXT */, &mMaxSamples);
+            }
+        }
 
+        bool samplesChanged = mRequestedSamples != int(gl_multisample);
+        if (samplesChanged)
+        {
+            mRequestedSamples = gl_multisample;
+            mSamples = std::clamp(mRequestedSamples, 1, std::max(mMaxSamples, 1));
+            if (mSamples != mRequestedSamples)
+                Printf("libretro GLES: requested MSAA %dx, using %dx (GPU support)\n", mRequestedSamples, mSamples);
+        }
+#endif
+
+		if (width != mWidth || height != mHeight)
+        {
+#ifdef __LIBRETRO__
+            ClearScene();
+            DeleteTexture(mSceneTex);
+#endif
+            CreatePipeline(width, height);
+        }
+
+#ifdef __LIBRETRO__
+        if (width != mWidth || height != mHeight || samplesChanged)
+#else
 		if (width != mWidth || height != mHeight )
+#endif
 			CreateScene(width, height);
 
 		mWidth = width;
@@ -151,6 +195,14 @@ namespace OpenGLESRenderer
 			mSceneStencilBuf = CreateRenderBuffer("SceneStencil", GL_STENCIL_INDEX8, width, height);
 		}
 		mSceneFB= CreateFrameBuffer("SceneFB", mSceneTex, mSceneDepthStencilBuf, mSceneStencilBuf);
+#ifdef __LIBRETRO__
+        if (mSamples > 1 && glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        {
+            Printf("libretro GLES: MSAA format unsupported; falling back to 1x\n");
+            mSamples = 1;
+            CreateScene(width, height);
+        }
+#endif
 	}
 
 	//==========================================================================
@@ -226,6 +278,10 @@ namespace OpenGLESRenderer
 		glGenRenderbuffers(1, &buf.handle);
 		glBindRenderbuffer(GL_RENDERBUFFER, buf.handle);
 
+#ifdef __LIBRETRO__
+        if (mSamples > 1) mMultisampleStorage(GL_RENDERBUFFER, mSamples, format, width, height);
+        else
+#endif
 		glRenderbufferStorage(GL_RENDERBUFFER, format, width, height);
 		return buf;
 	}
@@ -254,6 +310,11 @@ namespace OpenGLESRenderer
 		glGenFramebuffers(1, &fb.handle);
 		glBindFramebuffer(GL_FRAMEBUFFER, fb.handle);
 
+#ifdef __LIBRETRO__
+        // The extension resolves into the texture when the framebuffer is left.
+        if (mSamples > 1) mMultisampleTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorbuffer.handle, 0, mSamples);
+        else
+#endif
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorbuffer.handle, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthstencil.handle);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gles.depthStencilAvailable ? depthstencil.handle : stencil.handle);
@@ -376,6 +437,27 @@ namespace OpenGLESRenderer
 	// Makes the scene frame buffer active (multisample, depth, stecil, etc.)
 	//
 	//==========================================================================
+
+#ifdef __LIBRETRO__
+    void FGLRenderBuffers::SelectEye(int eye)
+    {
+        if (eye == mCurrentEye) return;
+        if (!mOtherEyeTex)
+        {
+            mOtherEyeTex = Create2DTexture("StereoEye", GL_RGBA, mWidth, mHeight);
+            mOtherEyeFB = CreateFrameBuffer("StereoEyeFB", mOtherEyeTex, mSceneDepthStencilBuf, mSceneStencilBuf);
+        }
+        std::swap(mSceneTex, mOtherEyeTex);
+        std::swap(mSceneFB, mOtherEyeFB);
+        mCurrentEye = eye;
+        BindCurrentFB();
+    }
+
+    void FGLRenderBuffers::BindEyeTexture(int eye, int unit)
+    {
+        (eye == mCurrentEye ? mSceneTex : mOtherEyeTex).Bind(unit);
+    }
+#endif
 
 	void FGLRenderBuffers::BindSceneFB(bool sceneData)
 	{

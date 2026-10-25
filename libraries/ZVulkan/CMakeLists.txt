@@ -235,3 +235,6 @@ if(BUILD_EXAMPLE)
   endif()
 endif()
 
+if(ENABLE_LIBRETRO)
+    target_compile_definitions(zvulkan PRIVATE __LIBRETRO__)
+endif()

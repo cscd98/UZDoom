@@ -119,14 +119,22 @@ void VkCommandBufferManager::FlushCommands(VulkanCommandBuffer** commands, size_
 	auto framebuffers = fb->GetFramebufferManager();
 	if (finish && framebuffers->PresentImageIndex != -1)
 	{
+#ifndef __LIBRETRO__
 		submit.AddWait(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, framebuffers->SwapChainImageAvailableSemaphore.get());
+#endif
 		submit.AddSignal(framebuffers->RenderFinishedSemaphores[framebuffers->PresentImageIndex].get());
 	}
 
 	if (!lastsubmit)
 		submit.AddSignal(mSubmitSemaphore[currentIndex].get());
 
+#ifdef __LIBRETRO__
+	Libretro::LockVulkanQueue();
+#endif
 	submit.Execute(fb->device.get(), fb->device->GraphicsQueue, mSubmitFence[currentIndex].get());
+#ifdef __LIBRETRO__
+	Libretro::UnlockVulkanQueue();
+#endif
 	mNextSubmit++;
 }
 

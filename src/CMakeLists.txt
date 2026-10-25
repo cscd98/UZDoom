@@ -48,7 +48,9 @@ if( NOT PROJECT_LIBRARIES )
 	set( PROJECT_LIBRARIES "" )
 endif()
 
-if( WIN32 )
+if(ENABLE_LIBRETRO)
+	add_definitions(-DNO_GTK -DNO_SEND_STATS)
+elseif( WIN32 )
 	set( PROJECT_LIBRARIES
 		Xinput
 		advapi32
@@ -105,7 +107,9 @@ else()
 endif()
 
 if( NOT NO_OPENAL )
-	if ( "vcpkg-openal-soft" IN_LIST VCPKG_MANIFEST_FEATURES )
+    if(ENABLE_LIBRETRO AND (ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$"))
+        list(APPEND PROJECT_LIBRARIES OpenAL::OpenAL)
+    elseif ( "vcpkg-openal-soft" IN_LIST VCPKG_MANIFEST_FEATURES )
 		# Statically link to OpenAL from vcpkg
 		find_package( OpenAL CONFIG REQUIRED )
 		list( APPEND PROJECT_LIBRARIES OpenAL::OpenAL )
@@ -132,6 +136,9 @@ if( NOT NO_OPENAL )
 endif()
 
 if( NO_OPENAL )
+	if(ENABLE_LIBRETRO)
+		message(FATAL_ERROR "Libretro audio requires OpenAL. Set NO_OPENAL=OFF and provide OpenAL, or use DYN_OPENAL=ON with OpenAL Soft installed.")
+	endif()
 	add_definitions( -DNO_OPENAL=1 )
 endif()
 
@@ -229,7 +236,9 @@ if( DEM_CMAKE_COMPILER_IS_GNUCXX_COMPATIBLE )
 		set( CMAKE_CXX_FLAGS "-Wno-unknown-pragmas -Wno-comment -Wno-format ${CMAKE_CXX_FLAGS}" )
 		set( CMAKE_CXX_FLAGS "-D_UNICODE -DUNICODE ${CMAKE_CXX_FLAGS}" )
 		set( CMAKE_CXX_FLAGS "-D_WIN32_WINNT=0x0600 ${CMAKE_CXX_FLAGS}" )
-		set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -municode" )
+		if(NOT ENABLE_LIBRETRO)
+			set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -municode" )
+		endif()
 	endif()
 
 	# Detect FreeBSD and add flags
@@ -294,7 +303,23 @@ if (HAVE_VULKAN)
 	list( APPEND PROJECT_LIBRARIES "zvulkan" )
 endif()
 
+if(ENABLE_LIBRETRO_STATIC_BUILD)
+	set(FT_DISABLE_ZLIB ON)
+	set(FT_DISABLE_BZIP2 ON)
+	set(FT_DISABLE_PNG ON)
+	set(FT_DISABLE_HARFBUZZ ON)
+	set(FT_DISABLE_BROTLI ON)
+endif()
+
 add_subdirectory("common/thirdparty/freetype-2.13.3")
+if(ENABLE_LIBRETRO AND MINGW AND BROTLIDEC_LIBRARIES AND NOT FT_DISABLE_BROTLI)
+    find_library(LIBRETRO_BROTLI_COMMON NAMES brotlicommon REQUIRED)
+    target_link_libraries(freetype PRIVATE "${LIBRETRO_BROTLI_COMMON}")
+endif()
+if(ENABLE_LIBRETRO AND (CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$"))
+	# HarfBuzz uses its own platform switch to select iOS font frameworks.
+	set(HB_IOS ON)
+endif()
 add_subdirectory("common/thirdparty/harfbuzz-7.3.0")
 add_subdirectory("utility/trex")
 list( APPEND PROJECT_LIBRARIES "trex" )
@@ -422,7 +447,24 @@ set( PLAT_COCOA_SOURCES
 	common/platform/posix/cocoa/st_console.mm
 	common/platform/posix/cocoa/st_start.mm )
 
-if( WIN32 )
+if(ENABLE_LIBRETRO)
+    if(WIN32)
+        set(PLAT_POSIX_SOURCES "")
+    endif()
+	set(SYSTEM_SOURCES_DIR common/platform/libretro common/platform/posix)
+	set(SYSTEM_SOURCES ${PLAT_POSIX_SOURCES}
+		common/platform/libretro/retro_paths.cpp
+		common/platform/libretro/retro_resources.cpp
+		common/platform/libretro/retro_system.cpp
+		common/platform/libretro/retro_input.cpp
+		common/platform/libretro/retro_video.cpp
+		common/platform/libretro/retro_vr.cpp
+		common/platform/libretro/retro_vulkan.cpp
+		common/platform/libretro/retro_audio.cpp
+		common/platform/libretro/retro_core.cpp
+		common/platform/libretro/retro_options.cpp
+		common/platform/libretro/retro_vfs.cpp)
+elseif( WIN32 )
 	set( SYSTEM_SOURCES_DIR common/platform/win32 )
 	set( SYSTEM_SOURCES ${PLAT_WIN32_SOURCES} )
 	set( OTHER_SYSTEM_SOURCES ${PLAT_POSIX_SOURCES} ${PLAT_SDL_SOURCES} ${PLAT_OSX_SOURCES} ${PLAT_COCOA_SOURCES} ${PLAT_UNIX_SOURCES} )
@@ -1276,7 +1318,61 @@ set( GAME_SOURCES
 set( GAME_NONPCH_SOURCES ${GAME_SOURCES} )
 list( REMOVE_ITEM GAME_NONPCH_SOURCES ${PCH_SOURCES} )
 
-add_executable( zdoom MACOSX_BUNDLE ${GAME_SOURCES} )
+if(ENABLE_LIBRETRO)
+	set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+		"${PROJECT_SOURCE_DIR}/wadsrc/static/menudef.txt"
+		"${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/generate_options.py")
+#	execute_process(COMMAND ${Python3_EXECUTABLE}
+#		"${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/generate_options.py"
+#		"${PROJECT_SOURCE_DIR}/wadsrc/static/menudef.txt"
+#		"${CMAKE_CURRENT_BINARY_DIR}/retro_menu_domains.h"
+#		RESULT_VARIABLE retro_options_result)
+#	if(NOT retro_options_result EQUAL 0)
+#		message(FATAL_ERROR "Could not generate libretro option domains")
+#	endif()
+	add_library(zdoom SHARED ${GAME_SOURCES})
+	add_custom_target(uzdoom_libretro DEPENDS zdoom)
+	set(retro_embedded_assembly "${CMAKE_CURRENT_BINARY_DIR}/embedded_pk3.S")
+	configure_file(common/platform/libretro/embedded_pk3.S.in "${retro_embedded_assembly}" @ONLY)
+	set_source_files_properties("${retro_embedded_assembly}" PROPERTIES
+		OBJECT_DEPENDS "${ZDOOM_OUTPUT_DIR}/uzdoom.pk3;${ZDOOM_OUTPUT_DIR}/game_support.pk3")
+	target_sources(zdoom PRIVATE "${retro_embedded_assembly}")
+    if(ANDROID OR APPLE)
+        target_sources(zdoom PRIVATE common/platform/libretro/retro_context_aarch64.S)
+    endif()
+    if(ANDROID)
+        target_link_options(zdoom PRIVATE "-Wl,-z,max-page-size=16384")
+    endif()
+	target_compile_definitions(zdoom PRIVATE __LIBRETRO__)
+	target_include_directories(zdoom PRIVATE "${PROJECT_SOURCE_DIR}/libraries/libretro-common/include")
+    if(WIN32)
+        target_link_libraries(zdoom bcrypt ws2_32 winmm shlwapi dbghelp psapi)
+        if(MINGW)
+            target_link_options(zdoom PRIVATE -static -static-libgcc -static-libstdc++)
+        endif()
+    elseif(APPLE)
+        target_link_options(zdoom PRIVATE
+            "-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/exports_apple.list")
+        set_property(TARGET zdoom APPEND PROPERTY LINK_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/exports_apple.list")
+    else()
+        target_link_options(zdoom PRIVATE -Wl,--no-undefined
+            "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/exports.map")
+        set_property(TARGET zdoom APPEND PROPERTY LINK_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/common/platform/libretro/exports.map")
+    endif()
+    if(ANDROID AND OPENMP_FOUND AND NOT NO_OPENMP)
+        target_link_options(zdoom PRIVATE -static-openmp)
+    endif()
+	if(APPLE)
+		set_source_files_properties(
+			common/platform/libretro/retro_core.cpp
+			PROPERTIES COMPILE_DEFINITIONS "_XOPEN_SOURCE=700;_DARWIN_C_SOURCE"
+		)
+	endif()
+else()
+	add_executable( zdoom MACOSX_BUNDLE ${GAME_SOURCES} )
+endif()
 
 target_include_directories( zdoom PRIVATE ${CMAKE_BINARY_DIR} )
 
@@ -1394,10 +1490,15 @@ include_directories(
 )
 
 set_target_properties( zdoom PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ZDOOM_OUTPUT_DIR} )
-set_target_properties( zdoom PROPERTIES OUTPUT_NAME ${ZDOOM_EXE_NAME} )
+if(ENABLE_LIBRETRO)
+	set_target_properties(zdoom PROPERTIES PREFIX "" OUTPUT_NAME "uzdoom_libretro"
+		LIBRARY_OUTPUT_DIRECTORY "${ZDOOM_OUTPUT_DIR}")
+else()
+	set_target_properties( zdoom PROPERTIES OUTPUT_NAME ${ZDOOM_EXE_NAME} )
+endif()
 
-if(NOT MINGW AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	set_target_properties(zdoom PROPERTIES LINK_FLAGS "-z nostart-stop-gc")
+if(NOT WIN32 AND NOT APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	target_link_options(zdoom PRIVATE "LINKER:-z,nostart-stop-gc")
 endif()
 
 if( MSVC )
@@ -1438,7 +1539,7 @@ elseif (APPLE)
 	IF ("${INSTALL_RPATH}" STREQUAL "")
 		set_target_properties(zdoom PROPERTIES MACOSX_RPATH TRUE)
 	endif()
-else()
+elseif(NOT ENABLE_LIBRETRO)
 	FILE( WRITE ${CMAKE_CURRENT_BINARY_DIR}/link-make "if [ ! -e ${ZDOOM_OUTPUT_DIR}/${ZDOOM_EXE_NAME} ]; then ln -sf ${CMAKE_CURRENT_BINARY_DIR}/${ZDOOM_EXE_NAME} ${ZDOOM_OUTPUT_DIR}/${ZDOOM_EXE_NAME}; fi" )
 	add_custom_command( TARGET zdoom POST_BUILD
 		COMMAND chmod +x ${CMAKE_CURRENT_BINARY_DIR}/link-make
@@ -1505,7 +1606,7 @@ if( DEM_CMAKE_COMPILER_IS_GNUCXX_COMPATIBLE )
 		APPEND_STRING PROPERTY COMPILE_FLAGS " ${SSE2_ENABLE}" )
 endif()
 
-if( APPLE )
+if( APPLE AND NOT ENABLE_LIBRETRO )
 	set( LINK_FRAMEWORKS "-framework Cocoa -framework IOKit -framework OpenGL")
 
 	if( HAVE_VULKAN )
@@ -1518,14 +1619,16 @@ if( APPLE )
 		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.zdoom.UZDoom"
 		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "" )
 
-	# Update plist bundle version from gitinfo.h at build time
-	add_custom_command(TARGET zdoom POST_BUILD
-		COMMAND "${CMAKE_COMMAND}"
-			-DGITINFO_H="${CMAKE_BINARY_DIR}/gitinfo.h"
-			-DPLIST_FILE="$<TARGET_BUNDLE_DIR:zdoom>/Contents/Info.plist"
-			-P "${CMAKE_CURRENT_SOURCE_DIR}/posix/osx/UpdatePlistVersion.cmake"
-		COMMENT "Updating bundle version in Info.plist"
-	)
+	if(NOT ENABLE_LIBRETRO)
+		# Update plist bundle version from gitinfo.h at build time
+		add_custom_command(TARGET zdoom POST_BUILD
+			COMMAND "${CMAKE_COMMAND}"
+				-DGITINFO_H="${CMAKE_BINARY_DIR}/gitinfo.h"
+				-DPLIST_FILE="$<TARGET_BUNDLE_DIR:zdoom>/Contents/Info.plist"
+				-P "${CMAKE_CURRENT_SOURCE_DIR}/posix/osx/UpdatePlistVersion.cmake"
+			COMMENT "Updating bundle version in Info.plist"
+		)
+	endif()
 
 	# Dymanic libraries like libvulkan.dylib or libMoltenVK.dylib will be loaded by dlopen()
 	# if placed in the directory with the main executable
@@ -1539,7 +1642,9 @@ endif()
 target_compile_options(zdoom PRIVATE
 	$<$<CXX_COMPILER_ID:AppleClang>:-fconstexpr-steps=100000000> )
 
-if( WIN32 )
+if(ENABLE_LIBRETRO)
+	set(INSTALL_PATH lib/libretro)
+elseif( WIN32 )
 	set( INSTALL_PATH . CACHE STRING "Directory where the executable will be placed during install." )
 else()
 	set( INSTALL_PATH bin CACHE STRING "Directory where the executable will be placed during install." )

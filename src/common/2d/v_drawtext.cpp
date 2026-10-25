@@ -667,9 +667,14 @@ std::u32string ConvertStringToUTF32(const chartype *string)
 	if constexpr (std::is_same_v<chartype, uint8_t> || std::is_same_v<chartype, char> ||
 	              std::is_same_v<chartype, char8_t>)
 	{
+#if defined(__LIBRETRO__) && defined(__ANDROID__)
+		const size_t length = std::strlen((const char *)string);
+#else
+		const size_t length = std::char_traits<chartype>::length(string);
+#endif
 		utf32String.resize(
-			simdutf::utf32_length_from_utf8((const char *)string, std::char_traits<chartype>::length(string)), '\0');
-		simdutf::convert_utf8_to_utf32((const char *)string, std::char_traits<chartype>::length(string),
+			simdutf::utf32_length_from_utf8((const char *)string, length), '\0');
+		simdutf::convert_utf8_to_utf32((const char *)string, length,
 		                               utf32String.data());
 	}
 	else if constexpr (std::is_same_v<chartype, char16_t>)
