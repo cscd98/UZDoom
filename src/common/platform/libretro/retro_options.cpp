@@ -42,15 +42,33 @@ const Binding bindings[] = {
     {"use", "Use / Open doors", PadUse},
     {"weapprev", "Previous weapon", PadPreviousWeapon},
     {"weapnext", "Next weapon", PadNextWeapon},
-    {"none", "Unbound", 0}, {"ctrl", "Fire (Left Ctrl)", 29}, {"e", "Use (E)", 18},
-    {"space", "Jump (Space)", 57}, {"shift", "Run (Left Shift)", 42}, {"c", "Crouch (C)", 46},
-    {"tab", "Automap (Tab)", 15}, {"escape", "Menu (Escape)", 1}, {"enter", "Enter", 28},
-    {"up", "Forward (Up)", 200}, {"down", "Backward (Down)", 208},
-    {"left", "Turn left (Left)", 203}, {"right", "Turn right (Right)", 205},
-    {"a", "Strafe left (A)", 30}, {"d", "Strafe right (D)", 32}, {"q", "Q", 16}, {"f", "F", 33},
-    {"1", "Weapon 1", 2}, {"2", "Weapon 2", 3}, {"3", "Weapon 3", 4}, {"4", "Weapon 4", 5},
-    {"5", "Weapon 5", 6}, {"6", "Weapon 6", 7}, {"7", "Weapon 7", 8},
-    {"f6", "Quicksave (F6)", 64}, {"f9", "Quickload (F9)", 67}, {"backquote", "Console", 41}
+    {"none", "Unbound", 0},
+    {"ctrl", "Fire (Left Ctrl)", 29},
+    {"e", "Use (E)", 18},
+    {"space", "Jump (Space)", 57},
+    {"shift", "Run (Left Shift)", 42},
+    {"c", "Crouch (C)", 46},
+    {"tab", "Automap (Tab)", 15},
+    {"escape", "Menu (Escape)", 1},
+    {"enter", "Enter", 28},
+    {"up", "Forward (Up)", 200},
+    {"down", "Backward (Down)", 208},
+    {"left", "Turn left (Left)", 203},
+    {"right", "Turn right (Right)", 205},
+    {"a", "Strafe left (A)", 30},
+    {"d", "Strafe right (D)", 32},
+    {"q", "Q", 16},
+    {"f", "F", 33},
+    {"1", "Weapon 1", 2},
+    {"2", "Weapon 2", 3},
+    {"3", "Weapon 3", 4},
+    {"4", "Weapon 4", 5},
+    {"5", "Weapon 5", 6},
+    {"6", "Weapon 6", 7},
+    {"7", "Weapon 7", 8},
+    {"f6", "Quicksave (F6)", 64},
+    {"f9", "Quickload (F9)", 67},
+    {"backquote", "Console", 41}
 };
 
 std::array<unsigned, 16> pad{};
@@ -58,8 +76,12 @@ float hudOffset = 0.3f;
 bool laserEnabled = true, autoResolution = true;
 unsigned pendingWidth = 0, pendingHeight = 0;
 unsigned rejectedWidth = 0, rejectedHeight = 0;
-const char *resolutions[] = {"640x480", "800x600", "1024x768", "1280x720", "1280x960",
-    "1600x1200", "1920x1080", "1920x1440", "2560x1440", "3840x2160"};
+
+const char *resolutions[] =
+{
+    "640x480", "800x600", "1024x768", "1280x720", "1280x960",
+    "1600x1200", "1920x1080", "1920x1440", "2560x1440", "3840x2160"
+};
 
 const char *Choice(const char *key, std::initializer_list<const char *> values, const char *fallback)
 {
@@ -96,6 +118,7 @@ void AddValue(retro_core_option_v2_definition& def, std::string value)
             return;
     }
 }
+
 std::string Number(double number)
 {
     char buffer[64];
@@ -105,9 +128,15 @@ std::string Number(double number)
 }
 }
 
-float VRHUDOffset() { return hudOffset; }
+float VRHUDOffset()
+{
+    return hudOffset;
+}
 
-bool VRLaserEnabled() { return laserEnabled; }
+bool VRLaserEnabled()
+{
+    return laserEnabled;
+}
 
 namespace
 {
@@ -187,6 +216,7 @@ void ApplyVRResolution(bool allowGrowth)
     if (Environment && Environment(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
     {
         ResizeOutput();
+
         char message[160];
         std::snprintf(message, sizeof(message), "Automatic render target: %ux%u; headset target: %ux%u per eye.\n",
             Width, Height, recommendedWidth / 2, recommendedHeight);
@@ -200,6 +230,7 @@ void ApplyVRResolution(bool allowGrowth)
         Height = oldHeight;
         MaxWidth = oldMaxWidth;
         MaxHeight = oldMaxHeight;
+
         Log(RETRO_LOG_WARN, "Frontend rejected the headset render size; keeping the current resolution.\n");
     }
 }
@@ -215,7 +246,9 @@ void ConfigureResolution()
     retro_variable option{"uzdoom_resolution", nullptr};
 
     if (Environment && Environment(RETRO_ENVIRONMENT_GET_VARIABLE, &option) && option.value)
+    {
         for (auto resolution : resolutions)
+        {
             if (!strcmp(resolution, option.value))
             {
                 std::sscanf(resolution, "%ux%u", &Width, &Height);
@@ -224,6 +257,8 @@ void ConfigureResolution()
 
                 break;
             }
+        }
+    }
 }
 
 bool VRSticksSwapped()
@@ -267,8 +302,8 @@ void RegisterOptions(bool engine)
         definitions.push_back(def);
     };
 
-    graphics("uzdoom_vr_hands", "VR thumbstick roles", "Swap movement and turn/weapon thumbsticks only. Gun tracking, triggers, grips and face buttons retain their physical hands.",
-        "swapped", {"swapped", "standard"});
+    graphics("uzdoom_vr_hands", "VR thumbstick roles", "Swap thumbsticks only. Gun tracking and triggers do not change.",
+        "swapped", {"standard", "swapped"});
     definitions.back().category_key = "input";
 
     graphics("uzdoom_mouse_sensitivity", "Mouse sensitivity", "Gameplay mouse sensitivity for both axes. 2 is the engine default. Menu cursor speed is unchanged.",
@@ -419,9 +454,8 @@ void ApplyOptions()
 
     bool changed = false;
     if (optionsApplied && Environment(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &changed) && !changed)
-    {
         return;
-    }
+
     optionsApplied = true;
 
     for (unsigned i = 0; i < 16; ++i)
@@ -465,11 +499,13 @@ void ApplyOptions()
 
     const char *mouseSensitivity = Choice("uzdoom_mouse_sensitivity",
         {"0.25", "0.5", "0.75", "1", "1.25", "1.5", "2", "2.5", "3", "4", "5", "6", "8"}, "2");
+
     set("m_sensitivity_x", mouseSensitivity);
     set("m_sensitivity_y", mouseSensitivity);
     set("gl_texture_filter_anisotropic", Choice("uzdoom_anisotropic", {"1", "2", "4", "8", "16"}, "4"));
     laserEnabled = !strcmp(Choice("uzdoom_vr_laser", {"on", "off"}, "on"), "on");
     set("gl_multisample", Choice("uzdoom_msaa", {"1", "2", "4", "8"}, "1"));
+
     const char *scale = Choice("uzdoom_supersampling", {"1", "1.25", "1.5", "1.75", "2"}, "1");
 
     if (applied["vid_scalefactor"] != scale)
@@ -480,4 +516,4 @@ void ApplyOptions()
 
     hudOffset = std::strtof(Choice("uzdoom_vr_hud_offset", {"0", "0.1", "0.2", "0.3", "0.4"}, "0.3"), nullptr);
 }
-}
+} // anonymous namespace
